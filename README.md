@@ -1,1 +1,1 @@
-Lien: les-grands-spots-de-surf.streamlit.app
+Lien: https://les-grands-spots-de-surf.streamlit.app
