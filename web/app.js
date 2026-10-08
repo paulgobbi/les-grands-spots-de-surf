@@ -51,11 +51,10 @@ function sorted(arr){return [...arr].sort((a,b)=>{
 const street='https://tiles.openfreemap.org/styles/liberty';
 const satellite={version:8,sources:{satellite:{type:'raster',tiles:['https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2020_3857/default/g/{z}/{y}/{x}.jpg'],tileSize:256,attribution:'Imagery © EOX / Sentinel-2 cloudless 2020'}},layers:[{id:'satellite',type:'raster',source:'satellite'}]};
 let map, mapReady=false;
-let styleGeneration=0;
 let closeUntil=0;
-try {map=new maplibregl.Map({container:'map',style:street,center:[0,14],zoom:1.55,attributionControl:true});map.addControl(new maplibregl.NavigationControl(),'bottom-right');map.on('load',()=>{mapReady=true;drawMap()});map.on('style.load',()=>{mapReady=true;drawMap();paintSelected();requestAnimationFrame(()=>drawMap())});map.on('error',ev=>{if(ev?.error){$('mapStatus').textContent='Impossible de charger certains éléments du fond de carte. Vérifie ta connexion ou repasse en mode Carte.';$('mapStatus').classList.remove('hidden')}})}catch(err){$('mapStatus').textContent='La carte n’a pas pu démarrer : '+err.message;$('mapStatus').classList.remove('hidden')}
+try {map=new maplibregl.Map({container:'map',style:street,center:[0,14],zoom:1.55,attributionControl:true});map.addControl(new maplibregl.NavigationControl(),'bottom-right');map.on('load',()=>{mapReady=true;drawMap();paintSelected()});map.on('style.load',()=>{mapReady=true;drawMap();paintSelected()});map.on('error',ev=>{if(ev?.error){$('mapStatus').textContent='Impossible de charger certains éléments du fond de carte. Vérifie ta connexion ou repasse en mode Carte.';$('mapStatus').classList.remove('hidden')}})}catch(err){$('mapStatus').textContent='La carte n’a pas pu démarrer : '+err.message;$('mapStatus').classList.remove('hidden')}
 const dataGeo=arr=>({type:'FeatureCollection',features:arr.map(o=>({type:'Feature',geometry:{type:'Point',coordinates:[Number(o.lon),Number(o.lat)]},properties:{id:o.id}}))});
-function drawMap(){if(!mapReady||!map?.isStyleLoaded())return;const data=dataGeo(state.visible);
+function drawMap(){if(!mapReady||!map)return;const data=dataGeo(state.visible);
  if(map.getSource('spots')){map.getSource('spots').setData(data);return}
  map.addSource('spots',{type:'geojson',data,cluster:true,clusterRadius:52,clusterMaxZoom:12});
  map.addLayer({id:'clusters',type:'circle',source:'spots',filter:['has','point_count'],paint:{'circle-color':'#087c9e','circle-stroke-color':'#fff','circle-stroke-width':3,'circle-radius':['step',['get','point_count'],19,10,24,25,29]}});
@@ -78,7 +77,7 @@ $('hamburger').addEventListener('click',()=>{const closed=$('shell').classList.t
 if(window.matchMedia('(max-width:650px)').matches)$('shell').classList.add('left-closed');
 $('detailClose').addEventListener('click',e=>{e.preventDefault();e.stopPropagation();closeUntil=performance.now()+400;state.selected=null;$('detail').classList.remove('open');$('detail').setAttribute('aria-hidden','true');paintSelected();renderResults();resize()});
 $('street').addEventListener('click',()=>setStyle(false));$('satellite').addEventListener('click',()=>setStyle(true));
-function setStyle(isSatellite){if(!map || state.satellite===isSatellite)return;state.satellite=isSatellite;$('street').classList.toggle('on',!isSatellite);$('satellite').classList.toggle('on',isSatellite);$('mapStatus').classList.add('hidden');mapReady=false;const generation=++styleGeneration;map.setStyle(isSatellite?satellite:street);map.once('style.load',()=>{if(generation!==styleGeneration)return;mapReady=true;drawMap();paintSelected()})}
+function setStyle(isSatellite){if(!map || state.satellite===isSatellite)return;state.satellite=isSatellite;$('street').classList.toggle('on',!isSatellite);$('satellite').classList.toggle('on',isSatellite);$('mapStatus').classList.add('hidden');mapReady=false;map.setStyle(isSatellite?satellite:street)}
 $('search').addEventListener('input',e=>{state.q=e.target.value;refresh()});
 $('reset').addEventListener('click',()=>{state.q='';$('search').value='';Object.values(state.sels).forEach(v=>v.clear());state.months.clear();for(const n of numeric)state.ranges[n.id]=[n.min,n.max];renderControls();refresh()});
 $('sort').addEventListener('change',e=>{state.sort=e.target.value;state.ascending=['name','country'].includes(e.target.value);syncSort();renderResults()});
