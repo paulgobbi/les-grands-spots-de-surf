@@ -1,0 +1,24 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Les Grands spots de surf</title>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@6.11.2/dist/maplibre-gl.css">
+<style>/*__CSS__*/</style></head><body>
+<div class="shell" id="shell">
+  <aside id="sidebar" class="sidebar">
+    <div class="brand"><div class="logo">≈</div><div><h1>Les Grands spots de surf</h1><small>Explorer les vagues mythiques du monde</small></div></div>
+    <div class="search-wrap"><span>⌕</span><input id="search" type="search" placeholder="Rechercher un spot, un pays…" aria-label="Rechercher"></div>
+    <div class="tabs"><button class="active" data-tab="filters">Filtres <span id="activeCount"></span></button><button data-tab="results">Résultats <span id="resultCount">146</span></button></div>
+    <div id="chips" class="chips"></div>
+    <section id="filtersPanel" class="panel scroller"><div class="panelheading"><strong>Affiner la recherche</strong><button id="reset" class="textbutton">Réinitialiser</button></div><div id="filterControls"></div></section>
+    <section id="resultsPanel" class="panel scroller hidden"><div class="sortline"><span id="resultSummary">146 spots</span><div class="sortbox"><select id="sort" aria-label="Trier"><option value="quality">Qualité</option><option value="name">Nom du spot</option><option value="country">Pays</option><option value="danger">Dangerosité</option><option value="history">Importance historique</option></select><button id="sortDir" aria-label="Inverser le tri" title="Inverser le tri">↓</button></div></div><div id="spotResults" class="spot-results"></div></section>
+    <footer class="side-footer"><span id="footerCount">146 spots sur 146</span><span>◦ Explorer le monde</span></footer>
+  </aside>
+  <main id="mapArea" class="map-area"><div id="map"></div>
+    <button id="hamburger" class="float hamburger" aria-label="Masquer les filtres" title="Afficher/masquer le panneau">☰</button>
+    <div class="map-switch"><button id="street" class="on">Carte</button><button id="satellite">Satellite</button></div>
+    <div id="mapStatus" class="map-status hidden"></div>
+    <div class="map-counter"><span class="dot"></span><span id="mapCount">146 spots</span></div>
+  </main>
+  <aside id="detail" class="detail" aria-label="Fiche spot"><div class="detail-top"><span>FICHE DU SPOT</span><button id="detailClose" title="Fermer la fiche" aria-label="Fermer la fiche">✕</button></div><div id="detailContent"></div></aside>
+</div>
+<script>const SPOTS = /*__SPOTS__*/;</script>
+<script type="module">/*__JS__*/</script>
+</body></html>
