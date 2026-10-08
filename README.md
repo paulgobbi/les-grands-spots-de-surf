@@ -39,3 +39,7 @@ Sous Windows, remplacer `python` par `py` si nécessaire. Le navigateur ouvrira 
 - Le fond *Carte* utilise OpenFreeMap et *Satellite* utilise l'imagerie Sentinel-2 Cloudless EOX (résolution différente de Google Earth). Ces services sont externes et leurs conditions/disponibilité peuvent évoluer.
 - L'interface fonctionne dans un cadre intégré à Streamlit de hauteur 900 px. Pour l'affichage sur de très grands écrans, le navigateur peut afficher du fond Streamlit en dessous du cadre ; ceci n'affecte pas la carte interne.
 - Les données originales sont conservées, avec une correction de `Point beak` vers `Point break` uniquement dans les **options de filtre** (la fiche garde le texte Excel).
+
+
+## Mise à jour de maintenance
+Remplacez les fichiers du dépôt GitHub par ceux du présent ZIP (notamment `app.py`, `web/app.js`, `web/style.css` et `web/spots.json`) puis committez. Streamlit redéploie automatiquement. Les données proviennent du classeur mis à jour.

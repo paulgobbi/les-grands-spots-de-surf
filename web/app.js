@@ -3,24 +3,26 @@ const $=id=>document.getElementById(id);
 const KEY={country:'Pays',break:'Type de break',direction:'Direction',bottom:'Fond',shape:'Morphologie',level:'Niveau min',power:'Puissance',frequency:'Fréquence'};
 const labels={country:'Pays',break:'Type de break',direction:'Direction',bottom:'Nature du fond',shape:'Morphologie',level:'Niveau du surfeur',power:'Puissance',frequency:'Fréquence de fonctionnement'};
 const order=['Débutant','Intermédiaire','Avancé','Expert','Élite'];
+const powerOrder=['Mellow','Mid','Puissante','Heavy'];
+const frequencyOrder=['Très fréquente','Fréquente','Régulière','Occasionnelle','Rare','Très rare'];
 const months=['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Aoû','Sep','Oct','Nov','Déc'];
 const filters=['country','break','direction','bottom','shape','level','power','size','month','frequency','quality','danger','history'];
-const numeric=[{id:'size',label:'Taille des vagues',min:0,max:30,step:.5,unit:'m'},{id:'quality',label:'Qualité / prestige',min:0,max:10,step:1,unit:'/10'},{id:'danger',label:'Dangerosité',min:0,max:10,step:1,unit:'/10'},{id:'history',label:'Importance historique',min:0,max:10,step:1,unit:'/10'}];
+const numeric=[{id:'size',label:'Taille des vagues',min:0,max:30,step:.5,unit:'m'},{id:'quality',label:'Qualité',min:0,max:10,step:1,unit:'/10'},{id:'danger',label:'Dangerosité',min:0,max:10,step:1,unit:'/10'},{id:'history',label:'Importance historique',min:0,max:10,step:1,unit:'/10'}];
 const state={tab:'filters',q:'',sels:{},ranges:{},months:new Set(),sort:'quality',ascending:false,selected:null,visible:[],satellite:false};
 const normalized=s=>String(s??'').toLocaleLowerCase('fr').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
 const escapeHtml=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const get=(o,k)=>o[k]??'';
 const num=(o,k)=>{let v=Number(String(get(o,k)).replace(',','.'));return get(o,k)===''||!Number.isFinite(v)?null:v};
 const sizeMin=o=>num(o,'Taille caractéristique min (face, m)');const sizeMax=o=>num(o,'Taille caractéristique max (face, m)');
-const score=(o,id)=>num(o,{quality:'Qualité / prestige /10',danger:'Dangerosité /10',history:'Importance historique /10'}[id]);
+const score=(o,id)=>num(o,{quality:'Qualité /10',danger:'Dangerosité /10',history:'Importance historique /10'}[id]);
 const tokens=(val,id)=>String(val??'').split(/\s*;\s*|\s*\/\s*|\s*,\s*/).map(x=>x.trim()).filter(Boolean).map(v=>id==='break'&&normalized(v)==='point beak'?'Point break':v);
 const opts={};
 for(const id of Object.keys(KEY)){
  let all=[];
  if(id==='level')all=order;
- else if(id==='direction')all=['Gauche','Droite','Variable'];
+ else if(id==='direction')all=['Gauche','Droite','Gauche et droite','Variable'];
  else all=SPOTS.flatMap(o=>tokens(o[KEY[id]],id));
- opts[id]=[...new Set(all)].sort((a,b)=>a.localeCompare(b,'fr'));
+ opts[id]=[...new Set(all)].sort((a,b)=>id==='level'?order.indexOf(a)-order.indexOf(b):id==='power'?(powerOrder.indexOf(a)<0?100:powerOrder.indexOf(a))-(powerOrder.indexOf(b)<0?100:powerOrder.indexOf(b)):id==='frequency'?(frequencyOrder.indexOf(a)<0?100:frequencyOrder.indexOf(a))-(frequencyOrder.indexOf(b)<0?100:frequencyOrder.indexOf(b)):a.localeCompare(b,'fr'));
  state.sels[id]=new Set();
 }
 for(const n of numeric)state.ranges[n.id]=[n.min,n.max];
@@ -31,7 +33,7 @@ function matches(o){
  if(state.q&&!['Nom du spot','Pays','Région','Localisation'].some(k=>normalized(get(o,k)).includes(normalized(state.q))))return false;
  for(const [id,selected] of Object.entries(state.sels)){
  if(!selected.size)continue;
- const values=id==='level'?levelsOf(o):id==='direction'?(get(o,'Direction')==='Gauche et droite'?['Gauche','Droite']:tokens(get(o,'Direction'),id)):tokens(get(o,KEY[id]),id);
+ const values=id==='level'?levelsOf(o):id==='direction'?(get(o,'Direction')==='Gauche et droite'?['Gauche et droite','Gauche','Droite']:tokens(get(o,'Direction'),id)):tokens(get(o,KEY[id]),id);
  if(!values.length||![...selected].some(v=>values.some(a=>normalized(a)===normalized(v))))return false;
  }
  if(state.months.size&&!seasonOf(o).some(m=>state.months.has(m)))return false;
@@ -49,7 +51,9 @@ function sorted(arr){return [...arr].sort((a,b)=>{
 const street='https://tiles.openfreemap.org/styles/liberty';
 const satellite={version:8,sources:{satellite:{type:'raster',tiles:['https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2020_3857/default/g/{z}/{y}/{x}.jpg'],tileSize:256,attribution:'Imagery © EOX / Sentinel-2 cloudless 2020'}},layers:[{id:'satellite',type:'raster',source:'satellite'}]};
 let map, mapReady=false;
-try {map=new maplibregl.Map({container:'map',style:street,center:[0,14],zoom:1.55,attributionControl:true});map.addControl(new maplibregl.NavigationControl(),'bottom-right');map.on('load',()=>{mapReady=true;drawMap()});map.on('style.load',()=>{mapReady=true;drawMap()});map.on('error',ev=>{if(ev?.error){$('mapStatus').textContent='Impossible de charger certains éléments du fond de carte. Vérifie ta connexion ou repasse en mode Carte.';$('mapStatus').classList.remove('hidden')}})}catch(err){$('mapStatus').textContent='La carte n’a pas pu démarrer : '+err.message;$('mapStatus').classList.remove('hidden')}
+let styleGeneration=0;
+let closeUntil=0;
+try {map=new maplibregl.Map({container:'map',style:street,center:[0,14],zoom:1.55,attributionControl:true});map.addControl(new maplibregl.NavigationControl(),'bottom-right');map.on('load',()=>{mapReady=true;drawMap()});map.on('style.load',()=>{mapReady=true;drawMap();paintSelected();requestAnimationFrame(()=>drawMap())});map.on('error',ev=>{if(ev?.error){$('mapStatus').textContent='Impossible de charger certains éléments du fond de carte. Vérifie ta connexion ou repasse en mode Carte.';$('mapStatus').classList.remove('hidden')}})}catch(err){$('mapStatus').textContent='La carte n’a pas pu démarrer : '+err.message;$('mapStatus').classList.remove('hidden')}
 const dataGeo=arr=>({type:'FeatureCollection',features:arr.map(o=>({type:'Feature',geometry:{type:'Point',coordinates:[Number(o.lon),Number(o.lat)]},properties:{id:o.id}}))});
 function drawMap(){if(!mapReady||!map?.isStyleLoaded())return;const data=dataGeo(state.visible);
  if(map.getSource('spots')){map.getSource('spots').setData(data);return}
@@ -59,9 +63,11 @@ function drawMap(){if(!mapReady||!map?.isStyleLoaded())return;const data=dataGeo
  map.addLayer({id:'unclustered',type:'circle',source:'spots',filter:['!', ['has','point_count']],paint:{'circle-radius':['case',['==',['get','id'],state.selected?.id??''],11,7],'circle-color':['case',['==',['get','id'],state.selected?.id??''],'#e5a82e','#087d9c'],'circle-stroke-color':'#fff','circle-stroke-width':2}});
  map.addLayer({id:'halo',type:'circle',source:'spots',filter:['all',['!', ['has','point_count']],['==',['get','id'],state.selected?.id??'']],paint:{'circle-radius':19,'circle-color':'#f5b72c','circle-opacity':.27,'circle-blur':.3}});
  map.moveLayer('halo','unclustered');
+ if(!map._surfHandlersBound){map._surfHandlersBound=true;
  map.on('click','clusters',e=>{const f=e.features?.[0];if(!f)return;const id=f.properties.cluster_id;map.getSource('spots').getClusterExpansionZoom(id).then(z=>map.easeTo({center:f.geometry.coordinates,zoom:z,duration:650})).catch(()=>{})});
  map.on('click','unclustered',e=>{const id=e.features?.[0]?.properties?.id;const o=SPOTS.find(x=>x.id===id);if(o)selectSpot(o)});
  for(const id of ['clusters','unclustered']){map.on('mouseenter',id,()=>map.getCanvas().style.cursor='pointer');map.on('mouseleave',id,()=>map.getCanvas().style.cursor='')}
+ }
 }
 function paintSelected(){if(mapReady&&map?.getLayer('unclustered')){map.setPaintProperty('unclustered','circle-radius',['case',['==',['get','id'],state.selected?.id??''],11,7]);map.setPaintProperty('unclustered','circle-color',['case',['==',['get','id'],state.selected?.id??''],'#e5a82e','#087d9c']);map.setFilter('halo',['all',['!', ['has','point_count']],['==',['get','id'],state.selected?.id??'']])}}
 function resize(){setTimeout(()=>{map?.resize()},270)}
@@ -70,9 +76,9 @@ document.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click',()
 $('hamburger').addEventListener('click',()=>{const closed=$('shell').classList.toggle('left-closed');$('hamburger').setAttribute('aria-label',closed?'Afficher les filtres':'Masquer les filtres');resize()});
 // On small screens, the map starts fully visible.
 if(window.matchMedia('(max-width:650px)').matches)$('shell').classList.add('left-closed');
-$('detailClose').addEventListener('click',()=>{state.selected=null;$('detail').classList.remove('open');paintSelected();renderResults();resize()});
+$('detailClose').addEventListener('click',e=>{e.preventDefault();e.stopPropagation();closeUntil=performance.now()+400;state.selected=null;$('detail').classList.remove('open');$('detail').setAttribute('aria-hidden','true');paintSelected();renderResults();resize()});
 $('street').addEventListener('click',()=>setStyle(false));$('satellite').addEventListener('click',()=>setStyle(true));
-function setStyle(isSatellite){state.satellite=isSatellite;$('street').classList.toggle('on',!isSatellite);$('satellite').classList.toggle('on',isSatellite);$('mapStatus').classList.add('hidden');mapReady=false;map.setStyle(isSatellite?satellite:street)}
+function setStyle(isSatellite){if(!map || state.satellite===isSatellite)return;state.satellite=isSatellite;$('street').classList.toggle('on',!isSatellite);$('satellite').classList.toggle('on',isSatellite);$('mapStatus').classList.add('hidden');mapReady=false;const generation=++styleGeneration;map.setStyle(isSatellite?satellite:street);map.once('style.load',()=>{if(generation!==styleGeneration)return;mapReady=true;drawMap();paintSelected()})}
 $('search').addEventListener('input',e=>{state.q=e.target.value;refresh()});
 $('reset').addEventListener('click',()=>{state.q='';$('search').value='';Object.values(state.sels).forEach(v=>v.clear());state.months.clear();for(const n of numeric)state.ranges[n.id]=[n.min,n.max];renderControls();refresh()});
 $('sort').addEventListener('change',e=>{state.sort=e.target.value;state.ascending=['name','country'].includes(e.target.value);syncSort();renderResults()});
@@ -84,7 +90,7 @@ function filterControl(id){const div=document.createElement('div');div.className
  for(const value of opts[id]){const item=document.createElement('label');item.className='option';item.dataset.value=value;const check=document.createElement('input');check.type='checkbox';check.checked=sel.has(value);check.addEventListener('change',()=>{check.checked?sel.add(value):sel.delete(value);button.querySelector('span').textContent=sel.size?[...sel].join(', '):'Toutes les valeurs';refresh()});item.append(check,document.createTextNode(value));dropdown.append(item)}
  button.addEventListener('click',()=>{document.querySelectorAll('.select-dropdown').forEach(el=>{if(el!==dropdown)el.classList.add('hidden')});dropdown.classList.toggle('hidden')});box.append(button,dropdown);div.append(box);return div}
 function rangeControl(n){const root=document.createElement('div');root.className='filter-group';root.innerHTML=`<div class="filter-label">${n.label}</div><div class="range-values"><span id="${n.id}Low"></span><span id="${n.id}High"></span></div><div class="range-pair"><div class="range-track"><div class="range-fill" id="${n.id}Fill"></div></div><input aria-label="${n.label} minimum" type="range" min="${n.min}" max="${n.max}" step="${n.step}" value="${state.ranges[n.id][0]}"><input aria-label="${n.label} maximum" type="range" min="${n.min}" max="${n.max}" step="${n.step}" value="${state.ranges[n.id][1]}"></div>`;
- const inp=root.querySelectorAll('input');function sync(){const r=state.ranges[n.id];inp[0].value=r[0];inp[1].value=r[1];root.querySelector(`#${n.id}Low`).textContent=`Min ${r[0]}${n.unit}`;root.querySelector(`#${n.id}High`).textContent=`Max ${r[1]}${n.unit}`;const el=root.querySelector(`#${n.id}Fill`);el.style.left=(r[0]-n.min)/(n.max-n.min)*100+'%';el.style.right=(n.max-r[1])/(n.max-n.min)*100+'%'}
+ const inp=root.querySelectorAll('input');inp[0].classList.add('min-thumb');inp[1].classList.add('max-thumb');function sync(){const r=state.ranges[n.id];inp[0].value=r[0];inp[1].value=r[1];root.classList.toggle('thumbs-touch',r[1]-r[0]<=n.step);root.querySelector(`#${n.id}Low`).textContent=`Min ${r[0]}${n.unit}`;root.querySelector(`#${n.id}High`).textContent=`Max ${r[1]}${n.unit}`;const el=root.querySelector(`#${n.id}Fill`);el.style.left=(r[0]-n.min)/(n.max-n.min)*100+'%';el.style.right=(n.max-r[1])/(n.max-n.min)*100+'%'}
  inp.forEach((input,i)=>input.addEventListener('input',()=>{const r=state.ranges[n.id];r[i]=Number(input.value);if(r[0]>r[1])r[1-i]=r[i];sync();refresh()}));sync();return root}
 function monthControl(){const root=document.createElement('div');root.className='filter-group';root.innerHTML='<div class="filter-label">Saison favorable</div>';const grid=document.createElement('div');grid.className='month-grid';months.forEach((m,i)=>{const btn=document.createElement('button');btn.className='month'+(state.months.has(i+1)?' active':'');btn.textContent=m;btn.type='button';btn.addEventListener('click',()=>{state.months.has(i+1)?state.months.delete(i+1):state.months.add(i+1);btn.classList.toggle('active',state.months.has(i+1));refresh()});grid.append(btn)});root.append(grid);return root}
 function renderControls(){const root=$('filterControls');root.replaceChildren();['country','break','direction','bottom','shape','level','power'].forEach(id=>root.append(filterControl(id)));root.append(rangeControl(numeric[0]));root.append(monthControl());root.append(filterControl('frequency'));numeric.slice(1).forEach(n=>root.append(rangeControl(n)))}
@@ -104,7 +110,7 @@ const fmt=v=>v===null?'—':String(v).replace('.',',');
 function row(label,value){return `<div class="detail-row"><label>${escapeHtml(label)}</label><b>${escapeHtml(value||'—')}</b></div>`}
 function meter(id,caption,icon,color,o){const n=score(o,id);return `<div class="note-item"><div class="note-top"><span style="color:${color}">${icon}</span> ${n??'—'}/10</div><div class="vertical-meter"><div class="fill" style="height:${n===null?0:Math.min(100,Math.max(0,n*10))}%;background:${color}"></div></div><div class="meter-name">${caption}</div></div>`}
 function badges(items,active,extra=''){return `<div class="badgegrid ${extra}">${items.map(v=>`<div class="mini-badge ${active(v)?'active':''}">${escapeHtml(v)}</div>`).join('')}</div>`}
-function selectSpot(o){state.selected=o;$('detail').classList.add('open');const a=sizeMin(o),b=sizeMax(o);const l=Math.max(0,Math.min(100,(a??0)/30*100)),r=Math.max(0,Math.min(100,(b??0)/30*100));const season=seasonOf(o);const ls=levelsOf(o);
+function selectSpot(o){if(performance.now()<closeUntil)return;state.selected=o;$('detail').classList.add('open');$('detail').setAttribute('aria-hidden','false');const a=sizeMin(o),b=sizeMax(o);const l=Math.max(0,Math.min(100,(a??0)/30*100)),r=Math.max(0,Math.min(100,(b??0)/30*100));const season=seasonOf(o);const ls=levelsOf(o);
  $('detailContent').innerHTML=`<div class="detail-inner"><h2>${escapeHtml(get(o,'Nom du spot'))}</h2><p class="detail-sub">${escapeHtml([get(o,'Localisation'),get(o,'Région'),get(o,'Pays')].filter(Boolean).join(' · '))}</p>
  <div class="section"><div class="note-row">${meter('quality','Qualité','★','#dea322',o)}${meter('danger','Danger','⚠','#dd5963',o)}${meter('history','Histoire','▥','#328dc4',o)}</div></div>
  <div class="section">${row('Type de break',get(o,'Type de break'))}${row('Fond',get(o,'Fond'))}${row('Direction',get(o,'Direction'))}</div>
